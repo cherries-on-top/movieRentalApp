@@ -1,0 +1,122 @@
+﻿
+@{
+    ViewBag.Title = "New";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>New Rental</h2>
+<form id="newRental">
+    <div class="form-group">
+        <label>Customer</label>
+        <div class="tt-container">
+            <input id="customer" name="customer" required data-rule-validateCustomer="true" type="text" value="" class="form-control" />
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Movie</label>
+        <div class="tt-container">
+            <input id="movie" name="movie" data-rule-validateMovie="true" type="text" value="" class="form-control" />
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 col-sm-4">
+            <ul id="movies" class="list-group"></ul>
+        </div>
+    </div>
+
+    <button class="btn btn-primary">Submit</button>
+</form>
+
+@section scripts{
+    @Scripts.Render("~/bundles/jqueryval")
+
+    <script>
+        $(document).ready(function () {
+            var viewModel = {
+                movieIds: []
+            };
+
+            var customers = new Bloodhound({
+                datumTokenizer: Bloodhound.tokenizers.obj.whitespace('Name'),
+                queryTokenizer: Bloodhound.tokenizers.whitespace,
+                remote: {
+                    url: '/api/customers?query=%QUERY',
+                    wildcard: '%QUERY'
+                }
+            });
+
+            $('#customer').typeahead({
+                minLength: 3,
+                highlight: true
+            }, {
+                    name: 'customers',
+                    display: 'Name',
+                    source: customers
+                }).on("typeahead:select", function (e, customer) {
+                    viewModel.customerId = customer.Id;
+                });
+
+            var movies = new Bloodhound({
+                datumTokenizer: Bloodhound.tokenizers.obj.whitespace('Name'),
+                queryTokenizer: Bloodhound.tokenizers.whitespace,
+                remote: {
+                    url: '/api/movies?query=%QUERY',
+                    wildcard: '%QUERY'
+                }
+            });
+
+            $('#movie').typeahead({
+                minLength: 3,
+                highlight: true
+            }, {
+                    name: 'movies',
+                    display: 'Name',
+                    source: movies
+                }).on("typeahead:select", function (e, movie) {
+                    $("#movies").append("<li class='list-group-item'>" + movie.Name + "</li>");
+
+                    $("#movie").typeahead("val", "");
+
+                    viewModel.movieIds.push(movie.Id);
+                });
+
+            $.validator.addMethod("validateCustomer", function () {
+                return viewModel.customerId && viewModel.customerId != 0;
+            }, "Select a valid customer.");
+
+            $.validator.addMethod("validateMovie", function () {
+                return viewModel.movieIds.length > 0;
+            }, "Select at least 1 movie.");
+
+            var validator = $("#newRental").validate({
+                submitHandler: function () {
+                    $.ajax({
+                        url: "/api/rentals",
+                        method: "POST",
+                        data: viewModel
+                    })
+                        .done(function () {
+                            toastr.success("Successfully recorded.");
+
+                            $("#customer").typeahead("val", "");
+                            $("#movie").typeahead("val", "");
+                            $("#movies").empty();
+
+                            viewModel = { movieIds: [] };
+
+                            validator.resetForm();
+                        })
+                        .fail(function () {
+                        toastr.error("An error occurred.");
+                        });
+                    // to prevent the form from being submitted normally
+                    return false;
+                }
+            });
+        });
+            
+    </script>
+    }
+
